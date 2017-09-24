@@ -121,6 +121,7 @@ Value: ap880216-0184
 Record 6
 Key: 7
 Value: ap880216-0198
+
 Record 7
 Key: 8
 Value: ap880217-0008
@@ -172,5 +173,14 @@ Value: nation
 
 ##### 3. 运行MRLDA
 接下来，根据输出文件夹`ap-sample-parsed`的结果进行主题提取，命令为：
-nohup hadoop jar target/mrlda-0.9.0-SNAPSHOT-fatjar.jar  cc.mrlda.VariationalInference  -input ap-sample-parsed/document -output ap-sample-lda  -term 10000 -topic 20 -iteration 50 -mapper 50 -reducer 20 >& lda.log &
+` hadoop jar target/mrlda-0.9.0-SNAPSHOT-fatjar.jar  cc.mrlda.VariationalInference  -input ap-sample-parsed/document -output ap-sample-lda  -term 10000 -topic 20 -iteration 50 -mapper 50 -reducer 20`
+这个命令，设置了`hadoop`的基本参数，以及lda的基本参数。为了让程序在后台自己跑，我们可以做其他的事情，并且就算我们退出当前的用户程序也不会被中断，就需要ubantu的`nohup`命令以及`&`命令。`nohup`命令可以使程序不会因为账户的退出而被中断；`>&lda.log`指的是将原本要输出正在控制台的各种信息重定向输出到lda.log文件里， 打开即可看见命令运行的全部过程；`&`在最后指的是将程序放到后台挂起执行。
 
+要想查看lda.log文件，并不断地读入更新，就像在控制台查看一样，可以使用命令：
+
+`tail -f lda.log`
+
+
+`nohup >& lda.log &
+
+这个命令中  nohup意思是退出当前账号 后面接着的命令不会被中断挂起， 
