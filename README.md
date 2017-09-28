@@ -121,7 +121,6 @@ Value: ap880216-0184
 Record 6
 Key: 7
 Value: ap880216-0198
-
 Record 7
 Key: 8
 Value: ap880217-0008
@@ -172,15 +171,62 @@ Value: nation
 
 
 ##### 3. 运行MRLDA
-接下来，根据输出文件夹`ap-sample-parsed`的结果进行主题提取，命令为：
+接下来，根据输出文件夹`ap-sample-parsed`的结果进行主题提取，完整命令为：
+`nohup hadoop jar target/mrlda-0.9.0-SNAPSHOT-fatjar.jar  cc.mrlda.VariationalInference  -input ap-sample-parsed/document -output ap-sample-lda  -term 10000 -topic 20 -iteration 50 -mapper 50 -reducer 20 >& lda.log &`
+下面分部分解释：
+
 ` hadoop jar target/mrlda-0.9.0-SNAPSHOT-fatjar.jar  cc.mrlda.VariationalInference  -input ap-sample-parsed/document -output ap-sample-lda  -term 10000 -topic 20 -iteration 50 -mapper 50 -reducer 20`
-这个命令，设置了`hadoop`的基本参数，以及lda的基本参数。为了让程序在后台自己跑，我们可以做其他的事情，并且就算我们退出当前的用户程序也不会被中断，就需要ubantu的`nohup`命令以及`&`命令。`nohup`命令可以使程序不会因为账户的退出而被中断；`>&lda.log`指的是将原本要输出正在控制台的各种信息重定向输出到lda.log文件里， 打开即可看见命令运行的全部过程；`&`在最后指的是将程序放到后台挂起执行。
+这个命令，设置了`hadoop`的基本参数，以及lda的基本参数。为了让程序在后台自己跑，我们可以做其他的事情，并且就算我们退出当前的用户程序也不会被中断，就需要ubantu的`nohup`命令以及`&`命令。`nohup`用于使程序在用户退出登陆、关闭终端之后仍能继续运行，最后的`&`命令是让程序放到后台执行；`>&lda.log`指的是将原本要输出正在控制台的各种信息重定向输出到lda.log文件里， 打开即可看见命令运行的全部过程；`&`在最后指的是将程序。
 
 要想查看lda.log文件，并不断地读入更新，就像在控制台查看一样，可以使用命令：
-
 `tail -f lda.log`
 
 
-`nohup >& lda.log &
+至此，一次简单的并行化MRLDA操作就已完成。接下来，我们使用另外的数据集：20-new-groups来做MRLDA的测试。在这一例子里涉及的操作包括：将数据集格式化为MRLDA数据，将数据集导入集群的HDFS文件系统， 使用MRLDA运行提取主题，使用指标`held-out likelihood`以及`Topic coherence`衡量主题提取结果。
 
-这个命令中  nohup意思是退出当前账号 后面接着的命令不会被中断挂起， 
+
+#### `20newsgroup`实例
+
+##### 1 .下载数据集
+
+	git clone git@github.com:lintool/Mr.LDA-data.git  # 克隆必要的处理文件项目
+	wget http://qwone.com/~jason/20Newsgroups/20news-bydate.tar.gz  
+	tar -xzvf 20news-bydate.tar.gz # 20news原始数据集
+	
+克隆项目到本地，进入Mr.LDA-data文件夹，可以看到以下文件夹以及压缩包
+
+	cd Mr.LDA-data
+	ls
+	# 以下是显示内容
+	# 上一个实例使用的数据集，以及处理文件
+	ap-sample.txt.gz  
+	ap.tgz  
+	parse_ap.py 
+
+	# 压缩包里有三个文件，分别是20new数据集的train(训练集)、test(测试集)、dev(验证集) 的划分，用标签表示； 
+	# parse_20news文件夹内含python文件用于生成MRLDA所需的处理文本 
+	20news-labels.tgz 
+	parse_20news  
+	README.md
+
+处理原始数据集，生成训练文本、测试文本、验证文本
+	
+	$ tar xvfz 20news-labels.tgz # 解压
+	$ python parse_20news/createLdacMrlda.py 20news-labels/train.labels 20news-labels/dev.labels 20news-labels/test.labels 10 500 # 执行其中的createLdacMrlda.py文件，并传入参数20new-labels里的三个文件， 10/500是可以自行设置的一个document里出现的单词的最低和最高频率。
+
+以上代码执行的结果是产生以下文件：
+		
+	# LDAC文件
+	20news.ldac.dev 20news.ldac.train 20news.ldac.test
+	# MRLDA文件
+	20news.mrlda.dev 20news.mrlda.train 20news.mrlda.test  
+	# RAW文件
+	20news.raw.dev 20news.raw.train 20news.raw.test 
+	# STAT文件
+	20news.stat.dev 20news.stat.train 20news.stat.test 
+	# 整个文档的词汇库：
+	20news.vocab.txt  
+
+#### 2.  运行Mr.LDA
+
+使用前一个步骤生成的文本 
