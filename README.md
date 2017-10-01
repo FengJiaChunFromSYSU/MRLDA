@@ -97,12 +97,11 @@
 	$ nohup hadoop jar target/mrlda-0.9.0-SNAPSHOT-fatjar.jar  cc.mrlda.VariationalInference  -input parse_output/document -output ap-sample-lda  -term 10000 -topic 20 -iteration 50 -mapper 50 -reducer 20 >& lda.log &`
 下面分部分解释：
 
-` hadoop jar target/mrlda-0.9.0-SNAPSHOT-fatjar.jar  cc.mrlda.VariationalInference  -input ap-sample-parsed/document -output ap-sample-lda  -term 10000 -topic 20 -iteration 50 -mapper 50 -reducer 20`
+`hadoop jar target/mrlda-0.9.0-SNAPSHOT-fatjar.jar  cc.mrlda.VariationalInference -input parse_output/document -output ap-sample-lda  -term 10000 -topic 20 -iteration 50 -mapper 50 -reducer 20`
 这个命令，设置了`hadoop`的基本参数，以及lda的基本参数。为了让程序在后台自己跑，我们可以做其他的事情，并且就算我们退出当前的用户程序也不会被中断，就需要ubantu的`nohup`命令以及`&`命令。`nohup`用于使程序在用户退出登陆、关闭终端之后仍能继续运行，最后的`&`命令是让程序放到后台执行；`>&lda.log`指的是将原本要输出正在控制台的各种信息重定向输出到lda.log文件里， 打开即可看见命令运行的全部过程；`&`在最后指的是将程序。
 
 要想查看lda.log文件，并不断地读入更新，就像在控制台查看一样，可以使用命令：
 `tail -f lda.log`
-
 
 至此，一次简单的并行化MRLDA操作就已完成。接下来，我们使用另外的数据集：20-new-groups来做MRLDA的测试。在这一例子里涉及的操作包括：将数据集格式化为MRLDA数据，将数据集导入集群的HDFS文件系统， 使用MRLDA运行提取主题，使用指标`held-out likelihood`以及`Topic coherence`衡量主题提取结果。
 
@@ -178,16 +177,56 @@
 	-rw-r--r--   3 hdfs hdfs   606353 2017-09-28 16:04 mrlda_output/title
 
 运行Mr.LDA：
-`nohup hadoop jar ldatrial/target/mrlda-0.9.0-SNAPSHOT-fatjar.jar cc.mrlda.VariationalInference -input mrlda_output/document -output mrlda_run_output -symmetricalpha 0.01 -topic 20 -term 100000 -iteration 1000  -mapper 50 -reducer 20 >& 20news.log &`
+	
+	$ nohup hadoop jar ldatrial/target/mrlda-0.9.0-SNAPSHOT-fatjar.jar cc.mrlda.VariationalInference -input mrlda_output/document -output mrlda_run_output -symmetricalpha 0.01 -topic 20 -term 100000 -iteration 1000  -mapper 50 -reducer 20 >& 20news.log &
 
+在本次实验中，模型66次之后收敛，显示内容如下：
 
+	INFO mrlda.VariationalInference: Model converged after 66 iterations...
+
+在`mrlda_run_output`文件夹下，是每一次迭代产生的$\alpha, \beta, \gamma$记录。
 
 #### 3. 衡量指标
+##### 计算 held-out likelihood
+衡量指标会用到[Blei's LDA implementation in C (LDAC) ](http://www.cs.princeton.edu/~blei/lda-c/)提供的源码 ，计算似然性需要在本步骤中生成`.beta`文件以及`.other`文件。这两个文件的文件名前缀需要一样，可自行设定，在本次实验中，设为 20news.mrlda.train.20.ldac.
 
-$ wget http://www.cs.princeton.edu/~blei/lda-c/lda-c-dist.tgz
-$ tar -xzvf lda-c-dist.tgz
-$ cd lda-c-dist
-$ make
+	$ wget http://www.cs.princeton.edu/~blei/lda-c/lda-c-dist.tgz # 下载代码
+	$ tar -xzvf lda-c-dist.tgz  # 解压
+	$ cd lda-c-dist 
+	$ make # 编译其中的c++文件
+	$ hadoop jar ldatrial/target/mrlda-0.9.0-SNAPSHOT-fatjar.jar edu.umd.cloud9.io.ReadSequenceFile mrlda_run_output/beta-66 > 20news.mrlda.train.20.beta # 生成.beta文件，转换为LDAC格式,其中beta-66是模型收敛的迭代数，可自行更改
+	$ wc 20news.vocab.txt # 显示文件的字节数、字符数、行数、文件名，在这里行数即为词库个数，文件的路径请自行写明更换
+	# 显示内容如下：
+	10283 10283 82497 Mr.LDA-data/parse_20news/20news.vocab.txt # 其中，82497就是行数，也就是单词数
+	$ python parse_20news/convertMrldaBetaToBeta.py 20news.mrlda.train.20.beta 20news.mrlda.train.20.ldac.beta  VOCAB_SIZE # 生成ldac的.beta文件，VOCAB_SIZE 在本次实验中赋值为82497
+	$ hadoop jar  ldatrial/target/mrlda-0.9.0-SNAPSHOT-fatjar.jar edu.umd.cloud9.io.ReadSequenceFile mrlda_run_output/alpha-66 # 查看模型的alpha数值，66为迭代收敛的次数,。 本次实验结果显示约为0.018
+	# 在 .beta 文件的目录下，生成 .other 文件
+	$ sudo nano 20news.mrlda.train.20.ldac.other # 使用nano文本编辑器来生成 .other 文件
+	# 在终端显示一个文本编辑器之后，输入以下信息，包括本次实验设置的主题个数、文档库的单词总数、alpha数值，然后保存退出：
+	num_topics 20
+	num_terms 82497
+	alpha 0.018
+
+最后，计算held-out-likehood
+
+	$ ./lda-c-list/lda inf ./lda-c-list/inf-settings.txt ./20news.mrlda.train.20.ldac ./20news.ldac.test ./20news.mrlda.20.HL 
+	# 各个文件的路径请写明，相对路径或是绝对路径均可，相对路径请加上./符号，其中 lda、inf-settings.txt 均在lda-c-list中，20news.mrlda.train.20.ldac 为 .beta、.other的文件前缀，指明这两个文件的路径， ./20news.mrlda.20.HL  为生成的文件的前缀及其输出路径。
+	# 在目标目录下，会生成两个文件：
+	20news.mrlda.20.HL-gamma.dat  
+	20news.mrlda.20.HL-lda-lhood.dat
+	$ cp 20news.mrlda.20.HL-lda-lhood.dat ./parse_20news/ # 将生成的 lhood.dat文件转移到 calculate_heldout_likelihood.py 所在的文件下，本次实验不做改动的话就是parse_news文件夹
+	$ python calculate_heldout_likelihood.py 20news.mrlda.20.HL-lda-lhood.dat
+	# 显示内容如下：
+	num_docs:  3646
+	avg likelihood:  -500.614934528
+	
+#### 计算主题相关度
+
+
+
+#### 显示主题内容
+
+
 
 
 
