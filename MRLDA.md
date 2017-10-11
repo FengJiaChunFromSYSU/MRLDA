@@ -20,7 +20,7 @@
 
 ​	将项目代码克隆到目标文件夹，克隆项目之前确保你拥有一个github的账号，在本机生成SSH密钥，并且将密钥保存至你的github账户上，能够可通一个项目到本地。具体可以参见[廖雪峰的github学习指南](https://www.liaoxuefeng.com/wiki/0013739516305929606dd18361248578c67b8067c8c017b000/001374385852170d9c7adf13c30429b9660d0eb689dd43a000)或者是[github-菜鸟教程](http://www.runoob.com/w3cnote/git-guide.html)
 
-#####step 2. 克隆`MRLDA`项目
+##### step 2. 克隆`MRLDA`项目
 
 ```shell
 git clone git@github.com:lintool/Mr.LDA.git
