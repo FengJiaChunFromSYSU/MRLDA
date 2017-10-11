@@ -142,7 +142,7 @@ $ nohup hadoop jar target/mrlda-0.9.0-SNAPSHOT-fatjar.jar  cc.mrlda.VariationalI
 
 ​	下载数据集，并将解压后的`labels`文件夹、`test`数据文件夹、`train`数据文件夹一同放到 `parse_20news`文件夹下，也就是与 `createLdacMrlda.py`同一个根目录。
 
-#####  [错误警示] 
+##### [错误警示] 
 
 ​	确保与parse_20news里的代码文件同一个目录下即可，否则会出现找不到文件的情况，或者最后生成的文件内容为空的情况 
 
